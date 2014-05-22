@@ -43,6 +43,8 @@ enum JBSourceMode {
 
     NSTimer *_nextImageTimer;
     enum JBSourceMode _sourceMode;
+
+    float _initialDelay;
 }
 
 @end
@@ -73,12 +75,29 @@ enum JBSourceMode {
 - (void) animateWithImagePaths:(NSArray *)imagePaths transitionDuration:(float)duration loop:(BOOL)shouldLoop isLandscape:(BOOL)isLandscape
 {
     _sourceMode = JBSourceModePaths;
-    [self _startAnimationsWithData:imagePaths transitionDuration:duration loop:shouldLoop isLandscape:isLandscape];
+    [self _startAnimationsWithData:imagePaths transitionDuration:duration initialDelay:0 loop:shouldLoop isLandscape:isLandscape];
 }
 
 - (void) animateWithImages:(NSArray *)images transitionDuration:(float)duration loop:(BOOL)shouldLoop isLandscape:(BOOL)isLandscape {
     _sourceMode = JBSourceModeImages;
-    [self _startAnimationsWithData:images transitionDuration:duration loop:shouldLoop isLandscape:isLandscape];
+    [self _startAnimationsWithData:images transitionDuration:duration initialDelay:0  loop:shouldLoop isLandscape:isLandscape];
+}
+
+- (void) animateWithImages:(NSArray *)images transitionDuration:(float)duration initialDelay:(float)initialDelay loop:(BOOL)shouldLoop isLandscape:(BOOL)isLandscape {
+    _sourceMode = JBSourceModeImages;
+    [self _startAnimationsWithData:images transitionDuration:duration initialDelay:initialDelay loop:shouldLoop isLandscape:isLandscape];
+}
+
+- (BOOL) isAnimating
+{
+    if (_nextImageTimer != nil && [_nextImageTimer isValid])
+    {
+        return YES;
+    }
+    else
+    {
+        return NO;
+    }
 }
 
 - (void)stopAnimation {
@@ -88,12 +107,13 @@ enum JBSourceMode {
     }
 }
 
-- (void)_startAnimationsWithData:(NSArray *)data transitionDuration:(float)duration loop:(BOOL)shouldLoop isLandscape:(BOOL)isLandscape
+- (void)_startAnimationsWithData:(NSArray *)data transitionDuration:(float)duration initialDelay:(float)initialDelay loop:(BOOL)shouldLoop isLandscape:(BOOL)isLandscape
 {
     _imagesArray        = [data mutableCopy];
     _showImageDuration  = duration;
     _shouldLoop         = shouldLoop;
     _isLandscape        = isLandscape;
+    _initialDelay       = initialDelay;
 
     // start at 0
     _currentImageIndex = -1;
@@ -276,17 +296,43 @@ enum JBSourceMode {
     
     [self addSubview:imageView];
     
-    // Generates the animation
-    [UIView beginAnimations:nil context:NULL];
-    [UIView setAnimationDuration:_showImageDuration + 2];
-    [UIView setAnimationCurve:UIViewAnimationCurveEaseIn];
-    CGAffineTransform rotate    = CGAffineTransformMakeRotation(rotation);
-    CGAffineTransform moveRight = CGAffineTransformMakeTranslation(moveX, moveY);
-    CGAffineTransform combo1    = CGAffineTransformConcat(rotate, moveRight);
-    CGAffineTransform zoomIn    = CGAffineTransformMakeScale(zoomInX, zoomInY);
-    CGAffineTransform transform = CGAffineTransformConcat(zoomIn, combo1);
-    imageView.transform = transform;
-    [UIView commitAnimations];
+    if (_initialDelay != 0)
+    {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(_initialDelay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:_showImageDuration + 2
+                                  delay:0
+                                options:UIViewAnimationCurveEaseIn
+                             animations:^{
+                                 CGAffineTransform rotate    = CGAffineTransformMakeRotation(rotation);
+                                 CGAffineTransform moveRight = CGAffineTransformMakeTranslation(moveX, moveY);
+                                 CGAffineTransform combo1    = CGAffineTransformConcat(rotate, moveRight);
+                                 CGAffineTransform zoomIn    = CGAffineTransformMakeScale(zoomInX, zoomInY);
+                                 CGAffineTransform transform = CGAffineTransformConcat(zoomIn, combo1);
+                                 imageView.transform = transform;
+                             }
+                             completion:^(BOOL isFinished){
+                                 
+                             }];
+        });
+        _initialDelay = 0;
+    }
+    else
+    {
+        [UIView animateWithDuration:_showImageDuration + 2
+                              delay:0
+                            options:UIViewAnimationCurveEaseIn
+                         animations:^{
+                             CGAffineTransform rotate    = CGAffineTransformMakeRotation(rotation);
+                             CGAffineTransform moveRight = CGAffineTransformMakeTranslation(moveX, moveY);
+                             CGAffineTransform combo1    = CGAffineTransformConcat(rotate, moveRight);
+                             CGAffineTransform zoomIn    = CGAffineTransformMakeScale(zoomInX, zoomInY);
+                             CGAffineTransform transform = CGAffineTransformConcat(zoomIn, combo1);
+                             imageView.transform = transform;
+                         }
+                         completion:^(BOOL isFinished){
+                             
+                         }];
+    }
 
     [self _notifyDelegate];
 
